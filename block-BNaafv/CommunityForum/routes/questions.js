@@ -15,7 +15,7 @@ router.post('/', auth.verifyToken, async (req, res, next) => {
     //let user = User.findById(req.user.userId);
     req.body.author = req.user.userId;
     let question = await Question.create(req.body);
-    let populatedQuestion = await Question.findById(question.id).populate('author', "_id username").populate('answers');
+    let populatedQuestion = await Question.findById(question.id).populate('author', "_id username").populate('answers', "_id text");
     res.status(201).json({ question: populatedQuestion });
   }catch(error){
     next(error);
@@ -29,12 +29,12 @@ router.post('/', auth.verifyToken, async (req, res, next) => {
 
 router.get('/', auth.verifyOptional, async (req, res, next) => {
   try{
-    let questions = await Question.find({}).populate('author', "_id username").populate('answers');
+    let questions = await Question.find({}).populate('author', "_id username").populate('answers', "_id text");
     res.status(201).json({ questions: questions });
   }catch(error){
     next(error);
   }
-})
+});
 
 // get Question
 
@@ -50,7 +50,7 @@ router.put('/:questionId', auth.verifyToken, async (req, res, next) => {
       if(req.body.title){
         req.body.slug = slugger(req.body.title) + randomString.generate(3);
       }
-      let updatedQuestion = await Question.findByIdAndUpdate(id, req.body, {new: true}).populate('author', "_id username").populate('answers');
+      let updatedQuestion = await Question.findByIdAndUpdate(id, req.body, {new: true}).populate('author', "_id username").populate('answers', "_id text");
       res.status(201).json({ question: updatedQuestion });
     }else{
       return res.status(400).json('you are not the author of this question!!');
@@ -83,5 +83,49 @@ router.delete('/:slug', auth.verifyToken, async (req, res, next) => {
 })
 
 // delete Question
+
+// create Answer
+
+router.post('/:questionId/answers', auth.verifyToken, async (req, res, next) => {
+  let id = req.params.questionId;
+  req.body.author = req.user.userId;
+  try{
+    let question = await Question.findById(id);
+    if(question){
+      let answer = await Answer.create(req.body);
+      let updatedQuestion = await Question.findByIdAndUpdate(id, {$push: {answers: answer.id}}, {new: true});
+      return res.status(201).json({ answer: answer.answerJSON(id) });
+    }else{
+      return res.status(400).json({ error: "No question Found!!" });
+    }
+  }catch(error){
+    next(error);
+  }
+})
+
+// create Answer
+
+// list answers
+
+router.get('/:questionId/answers', auth.verifyToken, async (req, res, next) => {
+  let id = req.params.questionId;
+  try{
+    let question = await Question.findById(id);
+    if(question){
+      let answers = await Answer.find({ _id: { $in: question.answers } }).populate('author', '_id username');
+      console.log(answers);
+      res.status(201).json({ answers: answers });
+    }else{
+      res.status(400).json({ error: "No Question Found!!" });
+    }
+  }catch(error){
+    next(error);
+  }
+});
+
+// list answers
+
+
+
 
 module.exports = router;
